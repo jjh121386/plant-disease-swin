@@ -4,6 +4,11 @@ from transformers import SwinForImageClassification, SwinConfig
 from torchvision import transforms
 from PIL import Image
 import torch.nn as nn
+import gdown
+import os
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
 
 # Define class names
 class_names = [
@@ -30,7 +35,12 @@ class SwinWithDropout(nn.Module):
         outputs = self.model(x)
         logits = outputs.logits
         logits = self.dropout(logits)
-        return outputs
+        return outputs, outputs.attentions
+
+# Check if model file exists
+model_path = 'swin_transformer_plant_village_finetuned_with_dropout.pth'
+if not os.path.exists(model_path):
+    st.error(f"Model file not found. Please download it from the link provided in the README and place it in the root directory of this repository.")
 
 # Load the model
 @st.cache_resource
@@ -39,7 +49,6 @@ def load_model():
     config = SwinConfig(image_size=224, num_labels=num_classes, output_attentions=True)
     base_model = SwinForImageClassification(config)
     model = SwinWithDropout(base_model)
-    model_path = 'C:\\Users\\jjh12\\swin_transformer_plant_village_finetuned_with_dropout.pth'
     state_dict = torch.load(model_path, map_location=torch.device('cpu'))
     model.load_state_dict(state_dict, strict=False)
     model.eval()
@@ -62,10 +71,10 @@ def predict(model, image):
     model.to(device)
     image = image.to(device)
     with torch.no_grad():
-        outputs = model(image)
+        outputs, attentions = model(image)
         logits = outputs.logits
         _, preds = torch.max(logits, 1)
-    return class_names[preds.item()]
+    return class_names[preds.item()], attentions
 
 # Streamlit app
 st.title("Plant Disease Classification")
@@ -80,5 +89,17 @@ if uploaded_file is not None:
     st.write("Classifying...")
     model = load_model()
     image = preprocess_image(image)
-    label = predict(model, image)
+    label, attentions = predict(model, image)
     st.write(f"Predicted Label: {label}")
+
+    # Display attention map
+    attention_map = attentions[-1][0].sum(dim=0).detach().cpu().numpy()
+    attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())  # Normalize to [0, 1]
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+    axs[0].imshow(image[0].permute(1, 2, 0).cpu().numpy())
+    axs[0].axis('off')
+    axs[0].set_title('Original Image')
+    axs[1].imshow(attention_map, cmap='viridis')
+    axs[1].axis('off')
+    axs[1].set_title('Attention Map')
+    st.pyplot(fig)
