@@ -30,5 +30,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 To download the dataset you need to have an API key .json file from Kaggle. 
 
-
+To run on streamlit from command prompt "streamlit run app2.py"
 
