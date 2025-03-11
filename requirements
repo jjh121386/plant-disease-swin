@@ -9,3 +9,6 @@ matplotlib
 seaborn
 numpy
 Kaggle
+json
+os
+zipfile
